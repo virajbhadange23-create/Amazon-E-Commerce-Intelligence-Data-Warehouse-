@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} - Amazon E-Commerce Data Warehouse</title>
+    
+    <!-- Immediate theme setter to prevent visual flash -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem("amazon_dw_theme");
+            const theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand-icon">A</div>
+                <div class="brand-text">
+                    <h1>Amazon DW</h1>
+                    <span>Intelligence Suite</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <span class="nav-label">Core Analytics</span>
+                <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    <span>Dashboard Overview</span>
+                </a>
+                <a href="/product-analysis" class="nav-link {% if active_page == 'product-analysis' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                    </svg>
+                    <span>Product Analysis</span>
+                </a>
+                <a href="/price-prediction" class="nav-link {% if active_page == 'price-prediction' or active_page == 'price-history' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    <span>Price Prediction</span>
+                </a>
+                <a href="/sales-analysis" class="nav-link {% if active_page == 'sales-analysis' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span>Monthly Sales Analysis</span>
+                </a>
+
+                <span class="nav-label">Data Mining & OLAP</span>
+                <a href="/clustering" class="nav-link {% if active_page == 'clustering' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    <span>K-Means Clustering</span>
+                </a>
+                <a href="/olap" class="nav-link {% if active_page == 'olap' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    <span>OLAP Analysis</span>
+                </a>
+
+                <span class="nav-label">Data Engineering & Warehouse</span>
+                <a href="/etl" class="nav-link {% if active_page == 'etl' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>ETL Process</span>
+                </a>
+                <a href="/data-quality" class="nav-link {% if active_page == 'data-quality' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>Data Quality Center</span>
+                </a>
+                <a href="/datasets" class="nav-link {% if active_page == 'datasets' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                    </svg>
+                    <span>Dataset Management</span>
+                </a>
+                <a href="/warehouse" class="nav-link {% if active_page == 'warehouse' %}active{% endif %}">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    <span>Star Schema Architecture</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="dw-badge">
+                    <span class="status-dot"></span>
+                    <span>Warehouse Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Wrapper -->
+        <div class="main-wrapper">
+            <!-- Header Bar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h2 class="page-title">{% block page_title %}Dashboard{% endblock %}</h2>
+                </div>
+
+                <div class="topbar-right">
+                    <!-- Dataset Indicator Pill -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-surface-elevated); padding: 0.4rem 0.85rem; border-radius: 20px; border: 1px solid var(--border-subtle); font-size: 0.8rem; font-weight: 600;">
+                        <span style="color: var(--success);">&#9679;</span>
+                        <span style="color: var(--text-muted);">Active Dataset:</span>
+                        <span style="color: var(--text-primary); font-family: monospace;">amazon_ecommerce_dataset.csv</span>
+                    </div>
+
+                    <!-- Theme Toggle Button -->
+                    <button id="theme-toggle" class="btn-theme" title="Toggle Light / Dark Mode" aria-label="Toggle Theme">
+                        <svg class="sun-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <svg class="moon-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="content-body">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Global Floating Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Data Warehouse Architecture & Star Schema{% endblock %}
+{% block page_title %}Data Warehouse Architecture & Star Schema{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Dimensional Modeling: Star Schema with surrogate keys, composite indexing, and normalized dimensions.</span>
+</div>
+
+<!-- Live Table Counts Grid -->
+<div class="kpi-grid">
+    <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+        <div class="kpi-card-header">
+            <span class="kpi-label">fact_sales (Fact)</span>
+            <span class="badge badge-warning">Center</span>
+        </div>
+        <div class="kpi-value" id="count-fact-sales">-</div>
+        <div class="kpi-subtext">Sales transactions &amp; prices</div>
+    </div>
+
+    <div class="kpi-card" style="border-left: 4px solid var(--primary);">
+        <div class="kpi-card-header">
+            <span class="kpi-label">dim_product</span>
+            <span class="badge badge-primary">Dimension</span>
+        </div>
+        <div class="kpi-value" id="count-dim-product">-</div>
+        <div class="kpi-subtext">Products &amp; ratings catalog</div>
+    </div>
+
+    <div class="kpi-card" style="border-left: 4px solid var(--secondary);">
+        <div class="kpi-card-header">
+            <span class="kpi-label">dim_date</span>
+            <span class="badge badge-primary">Dimension</span>
+        </div>
+        <div class="kpi-value" id="count-dim-date">-</div>
+        <div class="kpi-subtext">Time &amp; seasonal calendar</div>
+    </div>
+
+    <div class="kpi-card" style="border-left: 4px solid var(--success);">
+        <div class="kpi-card-header">
+            <span class="kpi-label">dim_category</span>
+            <span class="badge badge-primary">Dimension</span>
+        </div>
+        <div class="kpi-value" id="count-dim-category">-</div>
+        <div class="kpi-subtext">Catalog departments</div>
+    </div>
+</div>
+
+<!-- Additional Warehouse Tables Count Row -->
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem;">
+    <div class="card" style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">price_predictions</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin: 0.2rem 0;" id="count-predictions">-</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">ML regression models saved</div>
+    </div>
+    <div class="card" style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">product_clusters</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin: 0.2rem 0;" id="count-clusters">-</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">K-Means cluster assignments</div>
+    </div>
+    <div class="card" style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">etl_log</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin: 0.2rem 0;" id="count-etl-log">-</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Audit pipeline executions</div>
+    </div>
+</div>
+
+<!-- Interactive Star Schema Visual Diagram -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Interactive Star Schema Topology</h3>
+            <p class="card-subtitle">Visual representation of Foreign Key relationships to Central Fact Table</p>
+        </div>
+        <span class="badge badge-warning">1-to-Many Relationships</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2rem; padding: 2rem 1rem; background: var(--bg-surface-elevated); border-radius: 12px; border: 1px dashed var(--border-strong);">
+        <!-- Top Dimension: Date -->
+        <div style="background: var(--bg-surface); border: 2px solid var(--secondary); border-radius: 12px; padding: 1rem 1.5rem; width: 340px; box-shadow: var(--shadow-md);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong style="color: var(--secondary);">dim_date</strong>
+                <span class="badge badge-primary">PK: date_key</span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                <code>date_key (INT)</code> &bull; <code>day</code> &bull; <code>month</code> &bull; <code>month_name</code><br>
+                <code>quarter</code> &bull; <code>year</code> &bull; <code>year_month</code>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; width: 100%; flex-wrap: wrap;">
+            <!-- Left Dimension: Product -->
+            <div style="background: var(--bg-surface); border: 2px solid var(--primary); border-radius: 12px; padding: 1rem 1.5rem; width: 340px; box-shadow: var(--shadow-md);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <strong style="color: var(--primary);">dim_product</strong>
+                    <span class="badge badge-primary">PK: product_key</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                    <code>product_key (INT)</code> &bull; <code>product_id (ASIN)</code><br>
+                    <code>product_name</code> &bull; <code>category_key (FK)</code><br>
+                    <code>rating</code> &bull; <code>rating_count</code> &bull; <code>base_prices</code>
+                </div>
+            </div>
+
+            <!-- Central Fact Table -->
+            <div style="background: var(--bg-surface); border: 3px solid #f59e0b; border-radius: 14px; padding: 1.25rem 1.75rem; width: 380px; box-shadow: var(--shadow-glow);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <strong style="color: #f59e0b; font-size: 1.1rem;">fact_sales (Fact Table)</strong>
+                    <span class="badge badge-warning">Central Hub</span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.7;">
+                    <div><b style="color: var(--primary);">PK:</b> <code>sale_id (INTEGER AUTOINCREMENT)</code></div>
+                    <div><b style="color: var(--secondary);">FK1:</b> <code>product_key &rarr; dim_product</code></div>
+                    <div><b style="color: var(--secondary);">FK2:</b> <code>date_key &rarr; dim_date</code></div>
+                    <div><b style="color: var(--secondary);">FK3:</b> <code>category_key &rarr; dim_category</code></div>
+                    <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 0.5rem 0;">
+                    <div><b style="color: var(--success);">Measures:</b> <code>actual_price, discount_price</code></div>
+                    <div><b style="color: var(--success);">Measures:</b> <code>discount_percent, units_sold</code></div>
+                    <div><b style="color: var(--success);">Measures:</b> <code>sales_amount = (units &times; price)</code></div>
+                    <div><b style="color: var(--warning);">Audit Flag:</b> <code>is_sample = 1</code></div>
+                </div>
+            </div>
+
+            <!-- Right Dimension: Category -->
+            <div style="background: var(--bg-surface); border: 2px solid var(--success); border-radius: 12px; padding: 1rem 1.5rem; width: 340px; box-shadow: var(--shadow-md);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <strong style="color: var(--success);">dim_category</strong>
+                    <span class="badge badge-primary">PK: category_key</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                    <code>category_key (INT AUTOINCREMENT)</code><br>
+                    <code>category_name (TEXT UNIQUE)</code><br>
+                    9 E-Commerce Departments
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DDL Schema Reference Card -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Warehouse DDL Architecture &amp; Indexes</h3>
+            <p class="card-subtitle">Enforcing relational integrity and index performance</p>
+        </div>
+        <span class="badge badge-primary">SQLite 3.x</span>
+    </div>
+    <pre style="background: var(--bg-surface-elevated); padding: 1.25rem; border-radius: 10px; font-size: 0.8rem; overflow-x: auto; color: var(--text-secondary); line-height: 1.5;">
+-- Foreign Key Indexes for Fast Star-Join Queries
+CREATE INDEX IF NOT EXISTS idx_fact_sales_product ON fact_sales (product_key);
+CREATE INDEX IF NOT EXISTS idx_fact_sales_date ON fact_sales (date_key);
+CREATE INDEX IF NOT EXISTS idx_fact_sales_category ON fact_sales (category_key);
+
+-- Unique Composite Index for Strict ETL Idempotency
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fact_sales_unique ON fact_sales (product_key, date_key);
+    </pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    async function loadWarehouseCounts() {
+        try {
+            const data = await App.fetchAPI("/api/warehouse/counts");
+            const c = data.counts;
+
+            document.getElementById("count-fact-sales").textContent = App.formatNumber(c.fact_sales);
+            document.getElementById("count-dim-product").textContent = App.formatNumber(c.dim_product);
+            document.getElementById("count-dim-date").textContent = App.formatNumber(c.dim_date);
+            document.getElementById("count-dim-category").textContent = App.formatNumber(c.dim_category);
+            document.getElementById("count-predictions").textContent = App.formatNumber(c.price_predictions);
+            document.getElementById("count-clusters").textContent = App.formatNumber(c.product_clusters);
+            document.getElementById("count-etl-log").textContent = App.formatNumber(c.etl_log);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    await loadWarehouseCounts();
+});
+</script>
+{% endblock %}

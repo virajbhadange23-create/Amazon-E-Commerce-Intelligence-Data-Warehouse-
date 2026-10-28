@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Dataset Management{% endblock %}
+{% block page_title %}Dataset Management &amp; Ingestion Center{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Master E-Commerce Dataset: Inspect, validate, upload, download, and synchronize <code>amazon_ecommerce_dataset.csv</code> into the warehouse.</span>
+</div>
+
+<!-- Row 1: File Metadata Cards -->
+<div class="dataset-meta-grid">
+    <div class="dataset-meta-item">
+        <div class="dataset-meta-title">Dataset File</div>
+        <div class="dataset-meta-val" style="font-family: monospace; font-size: 1rem; color: var(--primary);" id="ds-filename">amazon_ecommerce_dataset.csv</div>
+    </div>
+
+    <div class="dataset-meta-item">
+        <div class="dataset-meta-title">File Size</div>
+        <div class="dataset-meta-val" id="ds-filesize">4.78 MB</div>
+    </div>
+
+    <div class="dataset-meta-item">
+        <div class="dataset-meta-title">Total Records</div>
+        <div class="dataset-meta-val" id="ds-total-rows">25,956 rows</div>
+    </div>
+
+    <div class="dataset-meta-item">
+        <div class="dataset-meta-title">Warehouse Status</div>
+        <div class="dataset-meta-val" style="color: var(--success); display: flex; align-items: center; gap: 0.35rem; font-size: 1.1rem;">
+            <span>&#9679;</span> Synchronized
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Ingestion & Upload Actions Card -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Dataset Ingestion &amp; Upload</h3>
+            <p class="card-subtitle">Upload a custom CSV file or trigger a full ETL synchronization with duplicate prevention</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <a href="/api/datasets/download" class="btn btn-secondary btn-sm" download="amazon_ecommerce_dataset.csv">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Download CSV
+            </a>
+            <button id="btn-sync-etl" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Re-Run ETL Sync
+            </button>
+        </div>
+    </div>
+
+    <form id="upload-csv-form" enctype="multipart/form-data" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+            <input type="file" id="csv-file-input" name="file" accept=".csv" class="form-select" style="padding: 0.5rem;">
+        </div>
+        <button type="submit" id="btn-upload-csv" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            Upload &amp; Import to Warehouse
+        </button>
+    </form>
+</div>
+
+<!-- Row 3: In-Browser Dataset Preview Table -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Dataset Schema &amp; Data Preview (First 25 Rows)</h3>
+            <p class="card-subtitle">Active structure of <code>amazon_ecommerce_dataset.csv</code></p>
+        </div>
+        <span class="badge badge-primary">10 Columns</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table" style="font-size: 0.85rem;">
+            <thead>
+                <tr>
+                    <th>Product ID</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th class="table-num">Actual Price</th>
+                    <th class="table-num">Discount Price</th>
+                    <th class="table-num">Discount %</th>
+                    <th class="table-num">Rating</th>
+                    <th class="table-num">Rating Count</th>
+                    <th class="table-num">Sales Qty</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="preview-table-body">
+                <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Loading dataset preview...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    async function loadDatasetInfo() {
+        try {
+            const res = await App.fetchAPI("/api/datasets/info");
+            if (res.success) {
+                document.getElementById("ds-filename").textContent = res.info.filename;
+                document.getElementById("ds-filesize").textContent = res.info.size_mb + " MB";
+                document.getElementById("ds-total-rows").textContent = App.formatNumber(res.info.row_count) + " rows";
+            }
+
+            await loadPreview();
+        } catch (e) {
+            console.error("Failed to load dataset info:", e);
+        }
+    }
+
+    async function loadPreview() {
+        try {
+            const res = await App.fetchAPI("/api/datasets/preview?limit=25");
+            const tbody = document.getElementById("preview-table-body");
+            tbody.innerHTML = "";
+
+            if (!res.preview || res.preview.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">No records found in CSV file.</td></tr>`;
+                return;
+            }
+
+            res.preview.forEach(r => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td style="font-family: monospace; font-weight: 600;">${r.product_id || "-"}</td>
+                    <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.product_name}">${r.product_name}</td>
+                    <td><span class="badge badge-primary">${r.category}</span></td>
+                    <td class="table-num">${r.actual_price}</td>
+                    <td class="table-num" style="font-weight: 700; color: var(--primary);">${r.discount_price}</td>
+                    <td class="table-num">${r.discount_percentage}</td>
+                    <td class="table-num" style="color: var(--warning);">${r.rating} ★</td>
+                    <td class="table-num">${App.formatNumber(r.rating_count)}</td>
+                    <td class="table-num">${App.formatNumber(r.sales_quantity)}</td>
+                    <td style="font-family: monospace;">${r.date}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error("Preview load failed:", e);
+        }
+    }
+
+    // Re-run ETL Sync Button
+    document.getElementById("btn-sync-etl").addEventListener("click", async () => {
+        App.showToast("Executing ETL Synchronization...", "info");
+        try {
+            const res = await App.fetchAPI("/api/etl/run", { method: "POST" });
+            if (res.success) {
+                App.showToast("ETL Pipeline completed successfully!", "success");
+                await loadDatasetInfo();
+            } else {
+                App.showToast("ETL execution failed: " + res.error, "danger");
+            }
+        } catch (e) {
+            App.showToast("Error triggering ETL sync.", "danger");
+        }
+    });
+
+    // Upload CSV form submission
+    document.getElementById("upload-csv-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById("csv-file-input");
+        if (!fileInput.files.length) {
+            App.showToast("Please select a CSV file to upload.", "warning");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        App.showToast("Uploading and importing CSV dataset...", "info");
+
+        try {
+            const response = await fetch("/api/datasets/upload", {
+                method: "POST",
+                body: formData
+            });
+            const data = await response.json();
+            if (data.success) {
+                App.showToast(`Imported ${data.rows_loaded} records successfully!`, "success");
+                await loadDatasetInfo();
+            } else {
+                App.showToast("Upload failed: " + data.error, "danger");
+            }
+        } catch (err) {
+            App.showToast("Error uploading dataset.", "danger");
+        }
+    });
+
+    await loadDatasetInfo();
+});
+</script>
+{% endblock %}
+

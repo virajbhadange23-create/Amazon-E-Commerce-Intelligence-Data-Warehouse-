@@ -1,0 +1,581 @@
+{% extends "base.html" %}
+
+{% block title %}Product Price Prediction{% endblock %}
+{% block page_title %}Product Price Prediction & Forecasting{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Machine Learning Time-Series Forecasting: Chronological evaluation, MAE/RMSE metrics, seasonal trend analysis &amp; multi-month forward horizons.</span>
+</div>
+
+<!-- Product & Target Month Selector Bar -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <!-- Search Input -->
+        <div style="flex: 2; min-width: 240px;">
+            <label for="product-search-input" class="form-label">Search Product (Type-Ahead)</label>
+            <div style="position: relative;">
+                <input type="text" id="product-search-input" class="form-select" placeholder="Type title or brand (Sony, Apple, Anker, Cable)..." autocomplete="off" style="padding-left: 2.3rem;">
+                <svg style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none;" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Category Filter -->
+        <div style="flex: 1.2; min-width: 170px;">
+            <label for="category-filter" class="form-label">Category Filter</label>
+            <select id="category-filter" class="form-select">
+                <option value="">All Categories</option>
+            </select>
+        </div>
+
+        <!-- Product Dropdown -->
+        <div style="flex: 2.2; min-width: 260px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <label for="product-select" class="form-label" style="margin-bottom: 0;">Select Product</label>
+                <span class="badge badge-primary" id="search-count-badge" style="font-size: 0.7rem;">50 Results</span>
+            </div>
+            <select id="product-select" class="form-select">
+                <option value="">Loading catalog products...</option>
+            </select>
+        </div>
+
+        <!-- Target Future Month Selector -->
+        <div style="flex: 1.2; min-width: 180px;">
+            <label for="target-month-select" class="form-label">Forecast Horizon</label>
+            <select id="target-month-select" class="form-select">
+                <option value="1" selected>Next Month (+1 Mo)</option>
+                <option value="2">+2 Months Ahead</option>
+                <option value="3">+3 Months Ahead</option>
+                <option value="6">+6 Months Ahead</option>
+            </select>
+        </div>
+
+        <!-- Predict Button -->
+        <button id="btn-run-prediction" class="btn btn-primary" style="height: 42px;">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Generate Forecast
+        </button>
+    </div>
+</div>
+
+<!-- Insufficient Data Warning Banner (Hidden by default) -->
+<div id="insufficient-data-alert" class="card" style="display: none; background: rgba(245, 158, 11, 0.1); border: 2px solid var(--warning); margin-bottom: 1.5rem;">
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="var(--warning)">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div>
+            <h4 style="color: var(--warning); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">Insufficient Historical Data</h4>
+            <p id="insufficient-data-msg" style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">At least 4 months of historical price data are required for time-series forecasting.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Main Prediction Results View -->
+<div id="prediction-results-container">
+    <!-- Row 1: Product Snapshot & Predicted Price Hero -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;" class="product-prediction-grid">
+        <!-- Current Product Snapshot Card -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3 class="card-title" id="disp-product-name">Selected Product</h3>
+                    <p class="card-subtitle" id="disp-product-category">Category</p>
+                </div>
+                <span class="badge badge-primary" id="disp-product-id">SKU</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 0.75rem;">
+                <div style="background: var(--bg-surface-elevated); padding: 0.85rem; border-radius: 10px;">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Latest Actual Price</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); margin-top: 4px;" id="disp-actual-price">₹-</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted);">Catalog Base MRP</div>
+                </div>
+
+                <div style="background: var(--bg-surface-elevated); padding: 0.85rem; border-radius: 10px;">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Latest Selling Price</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--primary); margin-top: 4px;" id="disp-discount-price">₹-</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted);">After Current Discount</div>
+                </div>
+
+                <div style="background: var(--bg-surface-elevated); padding: 0.85rem; border-radius: 10px;">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Discount % &amp; Rating</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--success); margin-top: 4px;" id="disp-discount-pct">-%</div>
+                    <div style="font-size: 0.7rem; color: var(--warning); font-weight: 600;" id="disp-rating">- ★</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Predicted Future Price Hero Card -->
+        <div class="card prediction-hero-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div>
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">ESTIMATED FUTURE PRICE</span>
+                    <h3 style="font-size: 2.2rem; font-weight: 800; color: var(--primary); margin: 0.25rem 0;" id="disp-predicted-price">₹-</h3>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;" id="disp-target-month-label">Target: Next Month</div>
+                </div>
+
+                <div style="text-align: right;">
+                    <span id="disp-diff-badge" class="diff-badge-drop" style="font-size: 0.95rem;">-₹0.00 (-0.0%)</span>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">vs. Latest Selling Price</div>
+                </div>
+            </div>
+
+            <!-- Model Evaluation Chips -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+                <span class="badge badge-purple" id="disp-model-name">Model: -</span>
+                <span class="badge badge-primary" id="disp-mae">MAE: -</span>
+                <span class="badge badge-success" id="disp-rmse">RMSE: -</span>
+                <span class="badge badge-warning" id="disp-r2">R²: -</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: Plain-English Explanation Banner -->
+    <div class="prediction-summary-banner">
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+            <div style="background: var(--primary-light); color: var(--primary); padding: 0.4rem; border-radius: 8px; flex-shrink: 0;">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div>
+                <h4 style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.25rem;">Forecast Explanation (Plain Words)</h4>
+                <p id="disp-explanation-text" style="font-size: 0.95rem; color: var(--text-primary); margin: 0; line-height: 1.5;">Select a product to view the forecast explanation.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: Interactive Monthly Line Chart -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Monthly Price Trajectory &amp; ML Forecast</h3>
+                <p class="card-subtitle">Historical actual MRP, historical selling price, and predicted future trajectory</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="badge badge-primary">Actual Price (MRP)</span>
+                <span class="badge badge-success">Selling Price</span>
+                <span class="badge badge-warning">Predicted Target</span>
+            </div>
+        </div>
+        <div class="chart-container" style="height: 380px;">
+            <canvas id="priceHistoryChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Row 4: Multi-Month Forward Outlook Cards -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">6-Month Forward Pricing Outlook</h3>
+                <p class="card-subtitle">Chronological step-by-step price projection</p>
+            </div>
+            <span class="badge badge-primary">Time Horizon: 1–6 Mo</span>
+        </div>
+        <div id="forecast-outlook-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+            <!-- Outlook items dynamically injected via JS -->
+        </div>
+    </div>
+
+    <!-- Row 5: Tables (Monthly Price History & Saved Prediction History) -->
+    <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem;" class="product-tables-grid">
+        <!-- Monthly History Table -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3 class="card-title">Monthly Price Breakdown</h3>
+                    <p class="card-subtitle">Chronological records from fact_sales</p>
+                </div>
+                <span class="badge badge-primary" id="history-rows-badge">18 Records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th class="table-num">Actual MRP</th>
+                            <th class="table-num">Selling Price</th>
+                            <th class="table-num">Discount %</th>
+                            <th class="table-num">Units Sold</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Select a product to view history</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Saved Prediction History Table (DB Persistence) -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3 class="card-title">Database Prediction History</h3>
+                    <p class="card-subtitle">Saved runs from price_predictions</p>
+                </div>
+                <span class="badge badge-success">Saved in SQLite</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Target Month</th>
+                            <th class="table-num">Predicted</th>
+                            <th>Model</th>
+                            <th class="table-num">MAE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prediction-history-body">
+                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No prior runs recorded</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    let historyChart = null;
+    let searchDebounceTimer = null;
+    let currentSelectedProductKey = 1;
+
+    // Load Categories & Initial Products
+    async function loadCatalog() {
+        try {
+            const catRes = await App.fetchAPI("/api/categories");
+            const catSelect = document.getElementById("category-filter");
+            catRes.categories.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.category_key;
+                opt.textContent = c.category_name;
+                catSelect.appendChild(opt);
+            });
+
+            await searchProducts("", "");
+            if (currentSelectedProductKey) {
+                runPrediction(currentSelectedProductKey, 1);
+            }
+        } catch (e) {
+            console.error("Error loading catalog:", e);
+        }
+    }
+
+    async function searchProducts(search = "", categoryKey = "") {
+        const countBadge = document.getElementById("search-count-badge");
+        if (countBadge) countBadge.textContent = "Searching...";
+
+        let url = `/api/products?limit=50&search=${encodeURIComponent(search)}`;
+        if (categoryKey) url += `&category_key=${categoryKey}`;
+
+        try {
+            const res = await App.fetchAPI(url);
+            const prodSelect = document.getElementById("product-select");
+            prodSelect.innerHTML = "";
+
+            if (!res.products || res.products.length === 0) {
+                prodSelect.innerHTML = `<option value="">No matching products found</option>`;
+                if (countBadge) countBadge.textContent = "0 Results";
+                return;
+            }
+
+            res.products.forEach((p, idx) => {
+                const opt = document.createElement("option");
+                opt.value = p.product_key;
+                opt.textContent = `${p.product_name} (${p.category_name} - ₹${p.base_discount_price})`;
+                if (idx === 0 && !currentSelectedProductKey) {
+                    currentSelectedProductKey = p.product_key;
+                }
+                prodSelect.appendChild(opt);
+            });
+
+            if (currentSelectedProductKey) {
+                prodSelect.value = currentSelectedProductKey;
+            }
+
+            if (countBadge) countBadge.textContent = `${res.count} Results`;
+        } catch (e) {
+            console.error("Product search failed:", e);
+        }
+    }
+
+    async function runPrediction(productKey, step = 1) {
+        if (!productKey) return;
+        currentSelectedProductKey = productKey;
+
+        const resultsContainer = document.getElementById("prediction-results-container");
+        const alertBox = document.getElementById("insufficient-data-alert");
+
+        App.showToast("Generating ML price forecast...", "info");
+
+        try {
+            const res = await App.fetchAPI(`/api/ml/predict/${productKey}?target_step=${step}`);
+
+            if (!res.success || !res.eligible) {
+                // Show insufficient data alert
+                if (resultsContainer) resultsContainer.style.display = "none";
+                if (alertBox) {
+                    alertBox.style.display = "block";
+                    document.getElementById("insufficient-data-msg").textContent = res.message || "Insufficient historical data for forecasting.";
+                }
+                return;
+            }
+
+            // Normal display
+            if (alertBox) alertBox.style.display = "none";
+            if (resultsContainer) resultsContainer.style.display = "block";
+
+            // 1. Snapshot cards
+            document.getElementById("disp-product-name").textContent = res.product.product_name;
+            document.getElementById("disp-product-category").textContent = res.product.category_name;
+            document.getElementById("disp-product-id").textContent = res.product.product_id;
+            document.getElementById("disp-actual-price").textContent = App.formatCurrency(res.latest_metrics.latest_actual_price);
+            document.getElementById("disp-discount-price").textContent = App.formatCurrency(res.latest_metrics.latest_discount_price);
+            document.getElementById("disp-discount-pct").textContent = App.formatPercent(res.latest_metrics.latest_discount_percent);
+            document.getElementById("disp-rating").textContent = `${res.product.rating} ★ (${App.formatNumber(res.product.rating_count)} reviews)`;
+
+            // 2. Predicted Price Hero
+            document.getElementById("disp-predicted-price").textContent = App.formatCurrency(res.predicted_price);
+            document.getElementById("disp-target-month-label").textContent = `Forecast Horizon: ${res.target_month_label}`;
+
+            const diffBadge = document.getElementById("disp-diff-badge");
+            const diffRupees = res.estimated_change.diff_rupees;
+            const diffPct = res.estimated_change.diff_percent;
+
+            if (diffRupees < 0) {
+                diffBadge.className = "diff-badge-drop";
+                diffBadge.innerHTML = `&#9660; ${App.formatCurrency(diffRupees)} (${diffPct}%)`;
+            } else if (diffRupees > 0) {
+                diffBadge.className = "diff-badge-increase";
+                diffBadge.innerHTML = `&#9650; +${App.formatCurrency(diffRupees)} (+${diffPct}%)`;
+            } else {
+                diffBadge.className = "badge badge-primary";
+                diffBadge.innerHTML = `₹0.00 (0.0%)`;
+            }
+
+            // 3. Evaluation Chips
+            document.getElementById("disp-model-name").textContent = `Model: ${res.evaluation.best_model}`;
+            document.getElementById("disp-mae").textContent = `MAE: ₹${res.evaluation.mae}`;
+            document.getElementById("disp-rmse").textContent = `RMSE: ₹${res.evaluation.rmse}`;
+            document.getElementById("disp-r2").textContent = `R²: ${res.evaluation.r2}`;
+
+            // 4. Plain-English Explanation
+            document.getElementById("disp-explanation-text").textContent = res.explanation;
+
+            // 5. 6-Month Forward Outlook Cards
+            const outlookGrid = document.getElementById("forecast-outlook-grid");
+            outlookGrid.innerHTML = "";
+            res.forecast_outlook.forEach(f => {
+                const isSelected = f.step === parseInt(step);
+                const item = document.createElement("div");
+                item.className = "card";
+                item.style.padding = "0.85rem";
+                item.style.border = isSelected ? "2px solid var(--primary)" : "1px solid var(--border-subtle)";
+                item.style.background = isSelected ? "var(--primary-light)" : "var(--bg-surface-elevated)";
+                item.innerHTML = `
+                    <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Step +${f.step}</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); margin: 2px 0;">${f.month_label}</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: var(--primary);">${App.formatCurrency(f.predicted_price)}</div>
+                    <div style="font-size: 0.72rem; font-weight: 600; color: ${f.diff_rupees < 0 ? 'var(--success)' : 'var(--warning)'}; margin-top: 2px;">
+                        ${f.diff_rupees < 0 ? '▼' : '▲'} ${App.formatCurrency(f.diff_rupees)} (${f.diff_percent}%)
+                    </div>
+                `;
+                outlookGrid.appendChild(item);
+            });
+
+            // 6. Monthly Line Chart
+            renderPriceChart(res.monthly_history, res.forecast_outlook, step);
+
+            // 7. Monthly Breakdown Table
+            const tbody = document.getElementById("history-table-body");
+            tbody.innerHTML = "";
+            res.monthly_history.forEach(h => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td style="font-weight: 600;">${h.year_month} (${h.month_name})</td>
+                    <td class="table-num">${App.formatCurrency(h.actual_price)}</td>
+                    <td class="table-num" style="font-weight: 700; color: var(--primary);">${App.formatCurrency(h.discount_price)}</td>
+                    <td class="table-num">${App.formatPercent(h.discount_percent)}</td>
+                    <td class="table-num">${App.formatNumber(h.units_sold)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById("history-rows-badge").textContent = `${res.monthly_history.length} Records`;
+
+            // 8. Saved Prediction History Table
+            const histBody = document.getElementById("prediction-history-body");
+            histBody.innerHTML = "";
+            if (res.prediction_history && res.prediction_history.length > 0) {
+                res.prediction_history.forEach(p => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td style="font-weight: 600;">${p.predicted_for_month}</td>
+                        <td class="table-num" style="font-weight: 700; color: var(--primary);">${App.formatCurrency(p.predicted_price)}</td>
+                        <td style="font-size: 0.8rem;">${p.model_name}</td>
+                        <td class="table-num">₹${p.mae}</td>
+                    `;
+                    histBody.appendChild(tr);
+                });
+            } else {
+                histBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No prior runs recorded</td></tr>`;
+            }
+
+            App.showToast("Forecast loaded successfully!", "success");
+        } catch (e) {
+            console.error("Prediction failed:", e);
+            App.showToast("Failed to generate prediction.", "danger");
+        }
+    }
+
+    function renderPriceChart(history, forecastOutlook, targetStep) {
+        const canvas = document.getElementById("priceHistoryChart");
+        if (!canvas) return;
+
+        const colors = window.getChartThemeColors();
+        const labels = history.map(h => h.year_month);
+        const actualPrices = history.map(h => h.actual_price);
+        const sellingPrices = history.map(h => h.discount_price);
+
+        // Append future forecast months
+        const targetStepInt = parseInt(targetStep);
+        const relevantOutlook = forecastOutlook.slice(0, targetStepInt);
+        const futureLabels = relevantOutlook.map(f => f.year_month);
+        const allLabels = [...labels, ...futureLabels];
+
+        // Null padding for actual prices and selling prices in future months
+        const paddedActual = [...actualPrices, ...relevantOutlook.map(() => null)];
+        const paddedSelling = [...sellingPrices, ...relevantOutlook.map(() => null)];
+
+        // Prediction line: starts at last historical selling price and connects to forecast
+        const predLine = history.map(() => null);
+        predLine[history.length - 1] = sellingPrices[sellingPrices.length - 1];
+        relevantOutlook.forEach(f => predLine.push(f.predicted_price));
+
+        if (historyChart) {
+            historyChart.destroy();
+        }
+
+        historyChart = new Chart(canvas, {
+            type: "line",
+            data: {
+                labels: allLabels,
+                datasets: [
+                    {
+                        label: "Actual MRP (₹)",
+                        data: paddedActual,
+                        borderColor: "rgba(100, 116, 139, 0.7)",
+                        backgroundColor: "transparent",
+                        borderDash: [4, 4],
+                        pointRadius: 3,
+                        tension: 0.2
+                    },
+                    {
+                        label: "Selling Price (₹)",
+                        data: paddedSelling,
+                        borderColor: "rgba(79, 70, 229, 0.9)",
+                        backgroundColor: "rgba(79, 70, 229, 0.08)",
+                        fill: true,
+                        pointRadius: 4,
+                        tension: 0.25
+                    },
+                    {
+                        label: "ML Forecast Trajectory (₹)",
+                        data: predLine,
+                        borderColor: "rgba(245, 158, 11, 1)",
+                        backgroundColor: "rgba(245, 158, 11, 0.12)",
+                        borderDash: [6, 4],
+                        fill: false,
+                        pointRadius: 6,
+                        pointHoverRadius: 9,
+                        pointBackgroundColor: "rgba(245, 158, 11, 1)",
+                        tension: 0.25
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: colors.ticks, font: { weight: 600 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return `${ctx.dataset.label}: ${App.formatCurrency(ctx.raw)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.ticks }
+                    },
+                    y: {
+                        grid: { color: colors.grid },
+                        ticks: {
+                            color: colors.ticks,
+                            callback: function(v) { return App.formatCurrency(v); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Event Handlers
+    document.getElementById("btn-run-prediction").addEventListener("click", () => {
+        const prodKey = document.getElementById("product-select").value;
+        const step = document.getElementById("target-month-select").value;
+        runPrediction(prodKey, step);
+    });
+
+    document.getElementById("product-select").addEventListener("change", (e) => {
+        const step = document.getElementById("target-month-select").value;
+        runPrediction(e.target.value, step);
+    });
+
+    document.getElementById("target-month-select").addEventListener("change", (e) => {
+        const prodKey = document.getElementById("product-select").value;
+        runPrediction(prodKey, e.target.value);
+    });
+
+    document.getElementById("category-filter").addEventListener("change", (e) => {
+        const search = document.getElementById("product-search-input").value;
+        searchProducts(search, e.target.value);
+    });
+
+    document.getElementById("product-search-input").addEventListener("input", (e) => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            const cat = document.getElementById("category-filter").value;
+            searchProducts(e.target.value, cat);
+        }, 300);
+    });
+
+    // Theme changes re-render chart colors
+    window.addEventListener("themeChanged", () => {
+        if (currentSelectedProductKey) {
+            const step = document.getElementById("target-month-select").value;
+            runPrediction(currentSelectedProductKey, step);
+        }
+    });
+
+    // Initialize
+    await loadCatalog();
+});
+</script>
+{% endblock %}
+

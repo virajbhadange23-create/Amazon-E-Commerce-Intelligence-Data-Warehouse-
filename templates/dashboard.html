@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Executive KPI Dashboard{% endblock %}
+{% block page_title %}Executive KPI Dashboard{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>E-Commerce Intelligence: Live Star Schema data warehouse populated from <code>amazon_ecommerce_dataset.csv</code> (Oct-Nov Festive Season &amp; May Summer Sale spikes).</span>
+</div>
+
+<!-- Filters Bar -->
+<div class="filter-bar">
+    <div class="filter-group">
+        <label for="filter-category" class="form-label">Category</label>
+        <select id="filter-category" class="form-select">
+            <option value="">All Categories</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="filter-start-ym" class="form-label">Start Month</label>
+        <select id="filter-start-ym" class="form-select">
+            <option value="">Earliest</option>
+        </select>
+
+        <label for="filter-end-ym" class="form-label">End Month</label>
+        <select id="filter-end-ym" class="form-select">
+            <option value="">Latest</option>
+        </select>
+
+        <button id="btn-apply-filters" class="btn btn-primary btn-sm">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Apply Filters
+        </button>
+        <button id="btn-reset-filters" class="btn btn-secondary btn-sm">Reset</button>
+    </div>
+</div>
+
+<!-- 4 Key Warehouse KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Total Products</span>
+            <div class="kpi-icon" style="background-color: var(--primary-light); color: var(--primary);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-total-products">-</div>
+        <div class="kpi-subtext">Active catalog items</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Average Price</span>
+            <div class="kpi-icon" style="background-color: var(--secondary-light); color: var(--secondary);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-avg-price">-</div>
+        <div class="kpi-subtext">Selling price after discount</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Average Discount</span>
+            <div class="kpi-icon" style="background-color: var(--warning-light); color: var(--warning);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-avg-discount">-</div>
+        <div class="kpi-subtext">Across warehouse sales</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Total Sales Revenue</span>
+            <div class="kpi-icon" style="background-color: var(--success-light); color: var(--success);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-total-sales">-</div>
+        <div class="kpi-subtext" id="kpi-units-sold">From fact_sales</div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;" class="dashboard-charts-grid">
+    <!-- Monthly Sales Trend Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Monthly Sales Trend</h3>
+                <p class="card-subtitle">Monthly revenue and volume from fact_sales</p>
+            </div>
+            <span class="badge badge-primary">18 Months History</span>
+        </div>
+        <div class="chart-container" style="height: 340px;">
+            <canvas id="salesTrendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Top 5 Products Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Top 5 Products</h3>
+                <p class="card-subtitle">Ranked by total sales revenue</p>
+            </div>
+            <span class="badge badge-success">Bestsellers</span>
+        </div>
+        <div class="chart-container" style="height: 340px;">
+            <canvas id="topProductsChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    let trendChart = null;
+    let topProdsChart = null;
+
+    // Load filter dropdowns
+    async function initFilters() {
+        try {
+            const [catsRes, datesRes] = await Promise.all([
+                App.fetchAPI("/api/categories"),
+                App.fetchAPI("/api/date-range")
+            ]);
+
+            const catSelect = document.getElementById("filter-category");
+            catsRes.categories.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.category_key;
+                opt.textContent = c.category_name;
+                catSelect.appendChild(opt);
+            });
+
+            const startSelect = document.getElementById("filter-start-ym");
+            const endSelect = document.getElementById("filter-end-ym");
+            datesRes.dates.forEach(d => {
+                const opt1 = document.createElement("option");
+                opt1.value = d.year_month;
+                opt1.textContent = d.year_month;
+                startSelect.appendChild(opt1);
+
+                const opt2 = document.createElement("option");
+                opt2.value = d.year_month;
+                opt2.textContent = d.year_month;
+                endSelect.appendChild(opt2);
+            });
+        } catch (e) {
+            console.error("Filter init failed", e);
+        }
+    }
+
+    // Load KPIs & Charts with filters
+    async function loadDashboardData() {
+        const cat = document.getElementById("filter-category").value;
+        const start = document.getElementById("filter-start-ym").value;
+        const end = document.getElementById("filter-end-ym").value;
+
+        const params = new URLSearchParams();
+        if (cat) params.append("category_key", cat);
+        if (start) params.append("start_ym", start);
+        if (end) params.append("end_ym", end);
+
+        try {
+            const [kpiRes, trendRes, topRes] = await Promise.all([
+                App.fetchAPI(`/api/dashboard/kpis?${params.toString()}`),
+                App.fetchAPI(`/api/dashboard/sales-trend?${params.toString()}`),
+                App.fetchAPI(`/api/dashboard/top-products?limit=5&${params.toString()}`)
+            ]);
+
+            // Update KPIs
+            const k = kpiRes.kpis;
+            document.getElementById("kpi-total-products").textContent = App.formatNumber(k.total_products || 0);
+            document.getElementById("kpi-avg-price").textContent = App.formatCurrency(k.avg_price || 0);
+            document.getElementById("kpi-avg-discount").textContent = App.formatPercent(k.avg_discount_percent || 0);
+            document.getElementById("kpi-total-sales").textContent = App.formatCurrency(k.total_sales_amount || 0);
+            document.getElementById("kpi-units-sold").textContent = `${App.formatNumber(k.total_units_sold || 0)} Units Sold`;
+
+            // Render Sales Trend Chart
+            const trendLabels = trendRes.trend.map(t => t.year_month);
+            const salesData = trendRes.trend.map(t => t.sales_amount);
+            const unitsData = trendRes.trend.map(t => t.units_sold);
+
+            const colors = window.getChartThemeColors();
+            const trendDatasets = [
+                {
+                    label: "Sales Revenue (₹)",
+                    data: salesData,
+                    borderColor: colors.primary,
+                    backgroundColor: "rgba(99, 102, 241, 0.15)",
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 2.5,
+                    yAxisID: "y"
+                },
+                {
+                    label: "Units Sold",
+                    data: unitsData,
+                    borderColor: colors.accent,
+                    backgroundColor: "transparent",
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    yAxisID: "y1"
+                }
+            ];
+
+            const trendOptions = {
+                scales: {
+                    y: {
+                        type: "linear",
+                        display: true,
+                        position: "left",
+                        grid: { color: colors.grid },
+                        ticks: {
+                            color: colors.ticks,
+                            callback: v => "₹" + (v >= 1000000 ? (v/1000000).toFixed(1) + "M" : (v/1000).toFixed(0) + "k")
+                        }
+                    },
+                    y1: {
+                        type: "linear",
+                        display: true,
+                        position: "right",
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: colors.ticks }
+                    }
+                }
+            };
+
+            const trendCanvas = document.getElementById("salesTrendChart");
+            trendChart = ChartFactory.createLineChart(trendCanvas, trendLabels, trendDatasets, trendOptions);
+
+            // Render Top 5 Products Bar Chart
+            const topLabels = topRes.products.map(p => p.product_name.length > 22 ? p.product_name.substring(0, 20) + "..." : p.product_name);
+            const topValues = topRes.products.map(p => p.total_sales_amount);
+
+            const topDatasets = [{
+                label: "Sales Revenue (₹)",
+                data: topValues,
+                backgroundColor: [
+                    "rgba(79, 70, 229, 0.8)",
+                    "rgba(14, 165, 233, 0.8)",
+                    "rgba(16, 185, 129, 0.8)",
+                    "rgba(245, 158, 11, 0.8)",
+                    "rgba(139, 92, 246, 0.8)"
+                ],
+                borderRadius: 6
+            }];
+
+            const topOptions = {
+                indexAxis: "y",
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        ticks: {
+                            callback: v => "₹" + (v >= 1000000 ? (v/1000000).toFixed(1) + "M" : (v/1000).toFixed(0) + "k")
+                        }
+                    }
+                }
+            };
+
+            const topCanvas = document.getElementById("topProductsChart");
+            topProdsChart = ChartFactory.createBarChart(topCanvas, topLabels, topDatasets, topOptions);
+
+        } catch (e) {
+            console.error("Dashboard data load error:", e);
+        }
+    }
+
+    document.getElementById("btn-apply-filters").addEventListener("click", loadDashboardData);
+    document.getElementById("btn-reset-filters").addEventListener("click", () => {
+        document.getElementById("filter-category").value = "";
+        document.getElementById("filter-start-ym").value = "";
+        document.getElementById("filter-end-ym").value = "";
+        loadDashboardData();
+    });
+
+    await initFilters();
+    await loadDashboardData();
+});
+</script>
+{% endblock %}

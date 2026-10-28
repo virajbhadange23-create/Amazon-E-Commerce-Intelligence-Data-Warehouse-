@@ -1,0 +1,27 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test & coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Runtime application logs (keep directory, ignore active log files)
+logs/*.log
+!logs/.gitkeep

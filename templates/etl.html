@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}ETL Process & Data Quality Audit{% endblock %}
+{% block page_title %}ETL Process & Data Quality Audit{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Idempotent ETL Architecture: Extract (CSV/Kaggle) &rarr; Transform (Data Quality &amp; Cleaning) &rarr; Load (Star Schema).</span>
+</div>
+
+<!-- ETL Action Header Card -->
+<div class="card" style="border: 2px solid var(--primary-light);">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h3 class="card-title">Extract, Transform &amp; Load Engine</h3>
+            <p class="card-subtitle">
+                Source: <code>data/raw/amazon_products.csv</code> &bull; Destination: <code>db/warehouse.db</code> (Star Schema)
+            </p>
+        </div>
+        <button id="btn-trigger-etl" class="btn btn-primary">
+            <svg id="etl-btn-icon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span id="etl-btn-text">Run ETL Pipeline</span>
+        </button>
+    </div>
+</div>
+
+<!-- Data Quality Audit Report Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Raw Rows Extracted</span>
+            <div class="kpi-icon" style="background-color: var(--secondary-light); color: var(--secondary);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="audit-extracted">-</div>
+        <div class="kpi-subtext">From raw CSV catalog</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Duplicates Removed</span>
+            <div class="kpi-icon" style="background-color: var(--warning-light); color: var(--warning);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="audit-duplicates">-</div>
+        <div class="kpi-subtext">Identified &amp; pruned</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Nulls / Formats Fixed</span>
+            <div class="kpi-icon" style="background-color: var(--primary-light); color: var(--primary);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="audit-nulls">-</div>
+        <div class="kpi-subtext">₹/$, commas, % strings</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Warehouse Records Loaded</span>
+            <div class="kpi-icon" style="background-color: var(--success-light); color: var(--success);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="audit-loaded">-</div>
+        <div class="kpi-subtext">In fact_sales (idempotent)</div>
+    </div>
+</div>
+
+<!-- ETL Execution Log Table -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">ETL Execution History (<code>etl_log</code> table)</h3>
+            <p class="card-subtitle">Complete audit trail of every pipeline run with timestamps and data quality stats</p>
+        </div>
+        <span class="badge badge-success" id="etl-runs-count">0 Runs Logged</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Run ID</th>
+                    <th>Started At</th>
+                    <th>Completed At</th>
+                    <th class="table-num">Extracted</th>
+                    <th class="table-num">Cleaned</th>
+                    <th class="table-num">Loaded</th>
+                    <th class="table-num">Duplicates</th>
+                    <th class="table-num">Nulls Fixed</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="etl-logs-tbody">
+                <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading ETL logs...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    async function loadETLStatus() {
+        try {
+            const data = await App.fetchAPI("/api/etl/status");
+            const logs = data.history;
+            const latest = data.latest_run;
+
+            document.getElementById("etl-runs-count").textContent = `${logs.length} Runs Logged`;
+
+            if (latest) {
+                document.getElementById("audit-extracted").textContent = App.formatNumber(latest.rows_extracted);
+                document.getElementById("audit-duplicates").textContent = App.formatNumber(latest.duplicates_removed);
+                document.getElementById("audit-nulls").textContent = App.formatNumber(latest.nulls_fixed);
+                document.getElementById("audit-loaded").textContent = App.formatNumber(latest.rows_loaded);
+            }
+
+            const tbody = document.getElementById("etl-logs-tbody");
+            tbody.innerHTML = "";
+
+            logs.forEach(log => {
+                const tr = document.createElement("tr");
+                const statusBadge = log.status === "SUCCESS"
+                    ? `<span class="badge badge-success">SUCCESS</span>`
+                    : `<span class="badge badge-danger">${log.status}</span>`;
+
+                tr.innerHTML = `
+                    <td style="font-weight: 700; color: var(--primary);">#${log.run_id}</td>
+                    <td>${log.started_at}</td>
+                    <td>${log.completed_at || '-'}</td>
+                    <td class="table-num">${App.formatNumber(log.rows_extracted)}</td>
+                    <td class="table-num">${App.formatNumber(log.rows_cleaned)}</td>
+                    <td class="table-num" style="font-weight: 700;">${App.formatNumber(log.rows_loaded)}</td>
+                    <td class="table-num">${App.formatNumber(log.duplicates_removed)}</td>
+                    <td class="table-num">${App.formatNumber(log.nulls_fixed)}</td>
+                    <td>${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error("ETL status error:", e);
+        }
+    }
+
+    document.getElementById("btn-trigger-etl").addEventListener("click", async function() {
+        const btn = document.getElementById("btn-trigger-etl");
+        const btnText = document.getElementById("etl-btn-text");
+        btn.disabled = true;
+        btnText.textContent = "Running Pipeline...";
+        App.showToast("Executing ETL Pipeline: Extracting, Cleaning, and Loading...", "info");
+
+        try {
+            const res = await App.fetchAPI("/api/etl/run", { method: "POST" });
+            if (res.success) {
+                App.showToast("ETL Pipeline completed successfully! (Idempotent update)", "success");
+                await loadETLStatus();
+                App.updateWarehouseStatus();
+            }
+        } catch (e) {
+            App.showToast("ETL execution failed: " + e.message, "danger");
+        } finally {
+            btn.disabled = false;
+            btnText.textContent = "Run ETL Pipeline";
+        }
+    });
+
+    await loadETLStatus();
+});
+</script>
+{% endblock %}

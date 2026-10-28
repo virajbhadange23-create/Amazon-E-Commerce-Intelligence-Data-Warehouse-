@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}K-Means Product Clustering{% endblock %}
+{% block page_title %}Data Mining: K-Means Product Segmentation{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Machine Learning Data Mining: Multidimensional feature scaling with <code>StandardScaler</code> (Price, Discount %, Rating, Sales Units) &bull; Inertia Elbow Optimization &bull; Silhouette Analysis &bull; Database Persistence.</span>
+</div>
+
+<!-- Controls & Optimal K Bar -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <!-- K selector buttons -->
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <label class="form-label" style="margin: 0; font-weight: 700;">Select Clusters (K):</label>
+            <div style="display: flex; gap: 0.35rem;" id="k-buttons-group">
+                <button class="btn btn-sm btn-secondary k-btn" data-k="2">K = 2</button>
+                <button class="btn btn-sm btn-primary k-btn active" data-k="3">K = 3 (Default)</button>
+                <button class="btn btn-sm btn-secondary k-btn" data-k="4">K = 4</button>
+                <button class="btn btn-sm btn-secondary k-btn" data-k="5">K = 5</button>
+                <button class="btn btn-sm btn-secondary k-btn" data-k="6">K = 6</button>
+            </div>
+        </div>
+
+        <!-- Badges & Action Buttons -->
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <div class="badge badge-primary" style="font-size: 0.82rem; padding: 0.45rem 0.8rem;" id="disp-optimal-k-badge">
+                Optimal K: Calculating...
+            </div>
+            <div class="badge badge-purple" style="font-size: 0.82rem; padding: 0.45rem 0.8rem;" id="disp-sil-badge">
+                Silhouette: Calculating...
+            </div>
+            <button id="btn-recluster" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Re-Train K-Means
+            </button>
+        </div>
+    </div>
+
+    <!-- Features in Use Indicator -->
+    <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted); flex-wrap: wrap;">
+        <span style="font-weight: 700; color: var(--text-secondary);">4 Multidimensional Features:</span>
+        <span class="badge badge-secondary">1. Average Selling Price (₹)</span>
+        <span class="badge badge-secondary">2. Average Discount (%)</span>
+        <span class="badge badge-secondary">3. Customer Star Rating (1–5)</span>
+        <span class="badge badge-secondary">4. Total Units Sold Volume</span>
+    </div>
+</div>
+
+<!-- Visualizations Row: 2D Scatter Plot & Elbow Curve -->
+<div style="display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; margin-bottom: 1.5rem;" class="clustering-charts-grid">
+    <!-- 2D Scatter Plot -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Product Clusters Scatter Projection</h3>
+                <p class="card-subtitle">X: Selling Price &bull; Y: Total Sales Revenue &bull; Color: Segment</p>
+            </div>
+            <span class="badge badge-success" id="scatter-count-badge">Loading...</span>
+        </div>
+        <div class="chart-container" style="height: 380px;">
+            <canvas id="clusterScatterChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Elbow Curve & Silhouette Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Elbow Method &amp; Silhouette Score</h3>
+                <p class="card-subtitle">Inertia (WCSS) decrease &amp; Silhouette evaluation across K = 2..8</p>
+            </div>
+            <span class="badge badge-warning">Evaluation</span>
+        </div>
+        <div class="chart-container" style="height: 380px;">
+            <canvas id="elbowCurveChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Cluster Summaries & Profiles Table -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Cluster Segments &amp; Metric Statistics (Saved to <code>product_clusters</code>)</h3>
+            <p class="card-subtitle">Cluster size, mean price, discount, rating, units, and commercial profile description</p>
+        </div>
+        <span class="badge badge-primary" id="clusters-count-badge">3 Clusters</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Cluster ID</th>
+                    <th>Segment Profile</th>
+                    <th class="table-num">Products Count</th>
+                    <th class="table-num">Avg Price</th>
+                    <th class="table-num">Avg Discount %</th>
+                    <th class="table-num">Rating</th>
+                    <th class="table-num">Avg Units</th>
+                    <th class="table-num">Total Revenue</th>
+                </tr>
+            </thead>
+            <tbody id="clusters-table-body">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Running K-Means algorithm...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Detailed Clustered Products Explorer (with Pagination & Filters) -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Clustered Products Explorer</h3>
+            <p class="card-subtitle">Browse all segmented products with pagination &amp; cluster filters</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <select id="filter-cluster-id" class="form-select form-select-sm" style="width: auto;">
+                <option value="">All Clusters</option>
+            </select>
+            <input type="text" id="search-cluster-products" class="form-select form-select-sm" placeholder="Search product..." style="width: 200px;">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Product Title</th>
+                    <th>Category</th>
+                    <th>Assigned Cluster</th>
+                    <th class="table-num">Avg Price</th>
+                    <th class="table-num">Discount %</th>
+                    <th class="table-num">Rating</th>
+                    <th class="table-num">Total Units</th>
+                    <th class="table-num">Total Sales</th>
+                </tr>
+            </thead>
+            <tbody id="cluster-products-tbody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading cluster products...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; gap: 0.5rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted);" id="cluster-page-info">Showing products</div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-secondary btn-sm" id="btn-cluster-prev" disabled>Previous</button>
+            <span style="font-size: 0.85rem; font-weight: 600;" id="cluster-current-page">Page 1</span>
+            <button class="btn btn-secondary btn-sm" id="btn-cluster-next">Next</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    let scatterChart = null;
+    let elbowChart = null;
+    let currentK = 3;
+    let allPoints = [];
+    let filteredPoints = [];
+    let currentPage = 1;
+    const pageSize = 20;
+
+    const clusterColors = [
+        "rgba(79, 70, 229, 0.85)",   // Indigo
+        "rgba(14, 165, 233, 0.85)",  // Sky
+        "rgba(16, 185, 129, 0.85)",  // Emerald
+        "rgba(245, 158, 11, 0.85)",  // Amber
+        "rgba(239, 68, 68, 0.85)",   // Rose
+        "rgba(139, 92, 246, 0.85)",  // Violet
+        "rgba(236, 72, 153, 0.85)",  // Pink
+        "rgba(20, 184, 166, 0.85)"   // Teal
+    ];
+
+    async function runClustering(k) {
+        currentK = k;
+        document.querySelectorAll(".k-btn").forEach(btn => {
+            if (btn.getAttribute("data-k") == k) {
+                btn.className = "btn btn-sm btn-primary k-btn active";
+            } else {
+                btn.className = "btn btn-sm btn-secondary k-btn";
+            }
+        });
+
+        App.showToast(`Training K-Means clustering with K=${k}...`, "info");
+
+        try {
+            const res = await App.fetchAPI(`/api/ml/clustering?k=${k}`);
+            if (!res.success) {
+                App.showToast("Clustering error: " + res.error, "danger");
+                return;
+            }
+
+            allPoints = res.scatter_points || [];
+            filteredPoints = [...allPoints];
+
+            // Badges
+            document.getElementById("disp-optimal-k-badge").textContent = `Recommended K: ${res.optimal_k}`;
+            document.getElementById("disp-sil-badge").textContent = `Silhouette Score: ${res.silhouette_score}`;
+            document.getElementById("clusters-count-badge").textContent = `${res.k} Clusters`;
+            document.getElementById("scatter-count-badge").textContent = `${App.formatNumber(res.scatter_points.length)} Products Segmented`;
+
+            // Populate cluster filter dropdown
+            const filterClusterSelect = document.getElementById("filter-cluster-id");
+            filterClusterSelect.innerHTML = `<option value="">All Clusters (${res.k})</option>`;
+            res.cluster_summaries.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.cluster_id;
+                opt.textContent = `Cluster #${c.cluster_id}: ${c.cluster_label} (${c.member_count} prods)`;
+                filterClusterSelect.appendChild(opt);
+            });
+
+            // 1. Render Cluster Summaries Table
+            const tbody = document.getElementById("clusters-table-body");
+            tbody.innerHTML = "";
+            res.cluster_summaries.forEach((c) => {
+                const tr = document.createElement("tr");
+                const colorDot = `<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${clusterColors[c.cluster_id % clusterColors.length]}; margin-right: 6px;"></span>`;
+                tr.innerHTML = `
+                    <td style="font-weight: 700;">${colorDot} Cluster #${c.cluster_id}</td>
+                    <td>
+                        <div style="font-weight: 700; color: var(--primary);">${c.cluster_label}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; margin-top: 2px;">${c.description}</div>
+                    </td>
+                    <td class="table-num" style="font-weight: 700;">${App.formatNumber(c.member_count)}</td>
+                    <td class="table-num" style="font-weight: 600;">${App.formatCurrency(c.avg_price)}</td>
+                    <td class="table-num">${App.formatPercent(c.avg_discount)}</td>
+                    <td class="table-num" style="color: var(--warning);">${c.avg_rating} ★</td>
+                    <td class="table-num">${App.formatNumber(c.avg_units)}</td>
+                    <td class="table-num" style="font-weight: 700; color: var(--success);">${App.formatCurrency(c.total_sales)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 2. Render 2D Scatter Plot
+            renderScatterChart(res);
+
+            // 3. Render Elbow & Silhouette Chart
+            renderElbowChart(res.elbow_curve, k);
+
+            // 4. Render Clustered Products Table
+            currentPage = 1;
+            renderProductsTable();
+
+            App.showToast(`K-Means (K=${k}) completed successfully!`, "success");
+        } catch (e) {
+            console.error("Clustering failed:", e);
+            App.showToast("Failed to run K-Means clustering.", "danger");
+        }
+    }
+
+    function renderScatterChart(res) {
+        const scatterCanvas = document.getElementById("clusterScatterChart");
+        const colors = window.getChartThemeColors();
+        const k = res.k;
+
+        const clusterGroups = {};
+        for (let i = 0; i < k; i++) clusterGroups[i] = [];
+
+        res.scatter_points.forEach(p => {
+            if (clusterGroups[p.cluster_id]) {
+                clusterGroups[p.cluster_id].push({
+                    x: p.avg_price,
+                    y: p.total_sales,
+                    name: p.product_name,
+                    category: p.category_name,
+                    discount: p.avg_discount,
+                    rating: p.rating,
+                    units: p.total_units
+                });
+            }
+        });
+
+        const datasets = res.cluster_summaries.map(c => ({
+            label: c.cluster_label,
+            data: clusterGroups[c.cluster_id] || [],
+            backgroundColor: clusterColors[c.cluster_id % clusterColors.length],
+            pointRadius: 5,
+            pointHoverRadius: 8
+        }));
+
+        if (scatterChart) scatterChart.destroy();
+        scatterChart = new Chart(scatterCanvas, {
+            type: "scatter",
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "top",
+                        labels: { color: colors.ticks, font: { weight: 600, size: 11 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const raw = ctx.raw;
+                                return [
+                                    raw.name,
+                                    `Category: ${raw.category}`,
+                                    `Price: ${App.formatCurrency(raw.x)}`,
+                                    `Total Revenue: ${App.formatCurrency(raw.y)}`,
+                                    `Units Sold: ${App.formatNumber(raw.units)} | Rating: ${raw.rating}★`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: "Average Selling Price (₹)", color: colors.ticks, font: { weight: 700 } },
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.ticks, callback: v => App.formatCurrency(v) }
+                    },
+                    y: {
+                        title: { display: true, text: "Total Sales Revenue (₹)", color: colors.ticks, font: { weight: 700 } },
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.ticks, callback: v => App.formatCurrency(v) }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderElbowChart(elbowCurve, activeK) {
+        const elbowCanvas = document.getElementById("elbowCurveChart");
+        const colors = window.getChartThemeColors();
+        const labels = elbowCurve.map(e => `K=${e.k}`);
+        const inertias = elbowCurve.map(e => e.inertia);
+        const silScores = elbowCurve.map(e => e.silhouette_score);
+
+        if (elbowChart) elbowChart.destroy();
+        elbowChart = new Chart(elbowCanvas, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: "Inertia / WCSS (Left Axis)",
+                        data: inertias,
+                        borderColor: "rgba(79, 70, 229, 0.9)",
+                        backgroundColor: "rgba(79, 70, 229, 0.1)",
+                        yAxisID: "y",
+                        tension: 0.3,
+                        pointRadius: 5
+                    },
+                    {
+                        label: "Silhouette Score (Right Axis)",
+                        data: silScores,
+                        borderColor: "rgba(16, 185, 129, 0.9)",
+                        backgroundColor: "transparent",
+                        borderDash: [5, 5],
+                        yAxisID: "y1",
+                        tension: 0.3,
+                        pointRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: colors.ticks } }
+                },
+                scales: {
+                    x: { ticks: { color: colors.ticks }, grid: { color: colors.grid } },
+                    y: {
+                        type: "linear",
+                        position: "left",
+                        ticks: { color: colors.ticks },
+                        grid: { color: colors.grid }
+                    },
+                    y1: {
+                        type: "linear",
+                        position: "right",
+                        ticks: { color: colors.ticks },
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderProductsTable() {
+        const tbody = document.getElementById("cluster-products-tbody");
+        tbody.innerHTML = "";
+
+        const totalPages = Math.max(1, Math.ceil(filteredPoints.length / pageSize));
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, filteredPoints.length);
+        const pageItems = filteredPoints.slice(startIdx, endIdx);
+
+        if (!pageItems.length) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No products match filter criteria</td></tr>`;
+            return;
+        }
+
+        pageItems.forEach(p => {
+            const tr = document.createElement("tr");
+            const colorDot = `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${clusterColors[p.cluster_id % clusterColors.length]}; margin-right: 6px;"></span>`;
+            tr.innerHTML = `
+                <td>
+                    <div style="font-weight: 700; color: var(--text-primary);">${p.product_name}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">SKU: ${p.product_id}</div>
+                </td>
+                <td><span class="badge badge-primary">${p.category_name}</span></td>
+                <td style="font-weight: 700;">${colorDot}${p.cluster_label}</td>
+                <td class="table-num" style="font-weight: 600;">${App.formatCurrency(p.avg_price)}</td>
+                <td class="table-num">${App.formatPercent(p.avg_discount)}</td>
+                <td class="table-num" style="color: var(--warning);">${p.rating} ★</td>
+                <td class="table-num">${App.formatNumber(p.total_units)}</td>
+                <td class="table-num" style="font-weight: 700; color: var(--success);">${App.formatCurrency(p.total_sales)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById("cluster-page-info").textContent = `Showing ${startIdx + 1}–${endIdx} of ${filteredPoints.length} products`;
+        document.getElementById("cluster-current-page").textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById("btn-cluster-prev").disabled = currentPage <= 1;
+        document.getElementById("btn-cluster-next").disabled = currentPage >= totalPages;
+    }
+
+    function applyTableFilters() {
+        const clusterId = document.getElementById("filter-cluster-id").value;
+        const query = document.getElementById("search-cluster-products").value.toLowerCase().trim();
+
+        filteredPoints = allPoints.filter(p => {
+            const matchCluster = clusterId === "" || p.cluster_id == parseInt(clusterId);
+            const matchQuery = query === "" || p.product_name.toLowerCase().includes(query) || p.product_id.toLowerCase().includes(query);
+            return matchCluster && matchQuery;
+        });
+
+        currentPage = 1;
+        renderProductsTable();
+    }
+
+    // Event Listeners
+    document.querySelectorAll(".k-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const k = parseInt(btn.getAttribute("data-k"));
+            runClustering(k);
+        });
+    });
+
+    document.getElementById("btn-recluster").addEventListener("click", () => {
+        runClustering(currentK);
+    });
+
+    document.getElementById("btn-cluster-prev").addEventListener("click", () => {
+        if (currentPage > 1) { currentPage--; renderProductsTable(); }
+    });
+
+    document.getElementById("btn-cluster-next").addEventListener("click", () => {
+        const totalPages = Math.ceil(filteredPoints.length / pageSize);
+        if (currentPage < totalPages) { currentPage++; renderProductsTable(); }
+    });
+
+    document.getElementById("filter-cluster-id").addEventListener("change", applyTableFilters);
+    document.getElementById("search-cluster-products").addEventListener("input", applyTableFilters);
+
+    window.addEventListener("themeChanged", () => {
+        runClustering(currentK);
+    });
+
+    await runClustering(3);
+});
+</script>
+{% endblock %}

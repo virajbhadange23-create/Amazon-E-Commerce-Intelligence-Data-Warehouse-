@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+
+{% block title %}Product Analysis{% endblock %}
+{% block page_title %}Catalog &amp; Product Intelligence Analysis{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Product Catalog Telemetry: Cross-category price benchmarking, discount distributions, rating density, and searchable SKU inventory.</span>
+</div>
+
+<!-- Filters Bar -->
+<div class="filter-bar">
+    <div class="filter-group">
+        <label for="filter-prod-cat" class="form-label">Category Filter</label>
+        <select id="filter-prod-cat" class="form-select">
+            <option value="">All Categories</option>
+        </select>
+    </div>
+
+    <div class="filter-group" style="flex: 2;">
+        <label for="filter-prod-search" class="form-label">Search Products</label>
+        <input type="text" id="filter-prod-search" class="form-select" placeholder="Filter by product title or SKU (e.g. Headphones, Adapter, Charger)...">
+    </div>
+
+    <button id="btn-reset-prod" class="btn btn-secondary btn-sm" style="height: 42px; align-self: flex-end;">Reset Filter</button>
+</div>
+
+<!-- 4 Summary KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Total Catalog Products</span>
+            <div class="kpi-icon" style="background-color: var(--primary-light); color: var(--primary);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-prod-total">-</div>
+        <div class="kpi-subtext">Active items in dim_product</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Average Catalog MRP</span>
+            <div class="kpi-icon" style="background-color: var(--secondary-light); color: var(--secondary);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-prod-mrp">-</div>
+        <div class="kpi-subtext">Un-discounted list price</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Average Selling Price</span>
+            <div class="kpi-icon" style="background-color: var(--success-light); color: var(--success);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-prod-selling">-</div>
+        <div class="kpi-subtext">Catalog selling price</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-card-header">
+            <span class="kpi-label">Average Star Rating</span>
+            <div class="kpi-icon" style="background-color: var(--warning-light); color: var(--warning);">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="kpi-value" id="kpi-prod-rating">- ★</div>
+        <div class="kpi-subtext">Customer feedback average</div>
+    </div>
+</div>
+
+<!-- Charts Row: Category Price Comparison & Rating Distribution -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;" class="two-col-grid">
+    <!-- Category Price Comparison Bar Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Category Average Price Comparison</h3>
+                <p class="card-subtitle">List MRP vs. Discounted Selling Price by Category</p>
+            </div>
+            <span class="badge badge-primary">Pricing Analysis</span>
+        </div>
+        <div class="chart-container" style="height: 340px;">
+            <canvas id="categoryPriceChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Rating Distribution Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">Customer Rating Distribution</h3>
+                <p class="card-subtitle">Products categorized by star rating tiers</p>
+            </div>
+            <span class="badge badge-warning">Rating Density</span>
+        </div>
+        <div class="chart-container" style="height: 340px;">
+            <canvas id="ratingDistChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Searchable Product Catalog Table -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">Product Catalog Inventory</h3>
+            <p class="card-subtitle">Detailed product attributes from dim_product</p>
+        </div>
+        <span class="badge badge-primary" id="catalog-count-badge">Loading...</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Product Title</th>
+                    <th>Category</th>
+                    <th class="table-num">Actual MRP</th>
+                    <th class="table-num">Selling Price</th>
+                    <th class="table-num">Discount %</th>
+                    <th class="table-num">Rating</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="catalog-table-body">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading products...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; gap: 0.5rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted);" id="catalog-page-info">Showing products</div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-secondary btn-sm" id="btn-catalog-prev" disabled>Previous</button>
+            <span style="font-size: 0.85rem; font-weight: 600;" id="catalog-current-page">Page 1</span>
+            <button class="btn btn-secondary btn-sm" id="btn-catalog-next">Next</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    let catChart = null;
+    let ratingChart = null;
+    let allProducts = [];
+    let currentPage = 1;
+    const pageSize = 20;
+    let searchDebounce = null;
+
+    async function init() {
+        try {
+            // Load Categories
+            const catRes = await App.fetchAPI("/api/categories");
+            const catSelect = document.getElementById("filter-prod-cat");
+            catRes.categories.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.category_key;
+                opt.textContent = c.category_name;
+                catSelect.appendChild(opt);
+            });
+
+            await fetchProducts();
+            await loadCategoryPriceChart();
+        } catch (e) {
+            console.error("Init failed:", e);
+        }
+    }
+
+    async function fetchProducts() {
+        const catKey = document.getElementById("filter-prod-cat").value;
+        const search = document.getElementById("filter-prod-search").value;
+
+        let url = `/api/products?limit=100&search=${encodeURIComponent(search)}`;
+        if (catKey) url += `&category_key=${catKey}`;
+
+        const res = await App.fetchAPI(url);
+        allProducts = res.products || [];
+        currentPage = 1;
+        renderTable();
+        updateKpis(allProducts);
+        renderRatingDistChart(allProducts);
+    }
+
+    function updateKpis(prods) {
+        if (!prods.length) return;
+        document.getElementById("kpi-prod-total").textContent = App.formatNumber(prods.length);
+        const avgMrp = prods.reduce((acc, p) => acc + p.base_actual_price, 0) / prods.length;
+        const avgSelling = prods.reduce((acc, p) => acc + p.base_discount_price, 0) / prods.length;
+        const avgRating = prods.reduce((acc, p) => acc + p.rating, 0) / prods.length;
+
+        document.getElementById("kpi-prod-mrp").textContent = App.formatCurrency(avgMrp);
+        document.getElementById("kpi-prod-selling").textContent = App.formatCurrency(avgSelling);
+        document.getElementById("kpi-prod-rating").textContent = `${avgRating.toFixed(1)} ★`;
+        document.getElementById("catalog-count-badge").textContent = `${prods.length} Products`;
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById("catalog-table-body");
+        tbody.innerHTML = "";
+
+        const totalPages = Math.max(1, Math.ceil(allProducts.length / pageSize));
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, allProducts.length);
+        const pageItems = allProducts.slice(startIdx, endIdx);
+
+        if (!pageItems.length) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No products match filter criteria</td></tr>`;
+            return;
+        }
+
+        pageItems.forEach(p => {
+            const discPct = Math.round(((p.base_actual_price - p.base_discount_price) / p.base_actual_price) * 100);
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>
+                    <div style="font-weight: 700; color: var(--text-primary);">${p.product_name}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">SKU: ${p.product_id}</div>
+                </td>
+                <td><span class="badge badge-primary">${p.category_name}</span></td>
+                <td class="table-num">${App.formatCurrency(p.base_actual_price)}</td>
+                <td class="table-num" style="font-weight: 700; color: var(--primary);">${App.formatCurrency(p.base_discount_price)}</td>
+                <td class="table-num">${discPct}%</td>
+                <td class="table-num" style="color: var(--warning); font-weight: 600;">${p.rating} ★</td>
+                <td>
+                    <a href="/price-prediction" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Forecast</a>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById("catalog-page-info").textContent = `Showing ${startIdx + 1}–${endIdx} of ${allProducts.length} items`;
+        document.getElementById("catalog-current-page").textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById("btn-catalog-prev").disabled = currentPage <= 1;
+        document.getElementById("btn-catalog-next").disabled = currentPage >= totalPages;
+    }
+
+    async function loadCategoryPriceChart() {
+        const res = await App.fetchAPI("/api/sales/category-share");
+        if (!res.success) return;
+
+        const canvas = document.getElementById("categoryPriceChart");
+        const colors = window.getChartThemeColors();
+        const labels = res.category_share.map(c => c.category_name);
+        const totals = res.category_share.map(c => c.total_sales);
+
+        if (catChart) catChart.destroy();
+        catChart = new Chart(canvas, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Category Revenue Share (₹)",
+                    data: totals,
+                    backgroundColor: "rgba(79, 70, 229, 0.8)",
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return `Revenue: ${App.formatCurrency(ctx.raw)}`; }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: colors.ticks, font: { size: 10 } } },
+                    y: {
+                        grid: { color: colors.grid },
+                        ticks: {
+                            color: colors.ticks,
+                            callback: function(v) { return App.formatCurrency(v); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderRatingDistChart(prods) {
+        const canvas = document.getElementById("ratingDistChart");
+        const colors = window.getChartThemeColors();
+
+        const tiers = { "4.5–5.0 ★": 0, "4.0–4.4 ★": 0, "3.5–3.9 ★": 0, "Below 3.5 ★": 0 };
+        prods.forEach(p => {
+            if (p.rating >= 4.5) tiers["4.5–5.0 ★"]++;
+            else if (p.rating >= 4.0) tiers["4.0–4.4 ★"]++;
+            else if (p.rating >= 3.5) tiers["3.5–3.9 ★"]++;
+            else tiers["Below 3.5 ★"]++;
+        });
+
+        if (ratingChart) ratingChart.destroy();
+        ratingChart = new Chart(canvas, {
+            type: "doughnut",
+            data: {
+                labels: Object.keys(tiers),
+                datasets: [{
+                    data: Object.values(tiers),
+                    backgroundColor: [
+                        "rgba(16, 185, 129, 0.85)",
+                        "rgba(14, 165, 233, 0.85)",
+                        "rgba(245, 158, 11, 0.85)",
+                        "rgba(239, 68, 68, 0.85)"
+                    ],
+                    borderWidth: 2,
+                    borderColor: "var(--bg-surface)"
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: "right", labels: { color: colors.ticks } }
+                }
+            }
+        });
+    }
+
+    document.getElementById("btn-catalog-prev").addEventListener("click", () => {
+        if (currentPage > 1) { currentPage--; renderTable(); }
+    });
+
+    document.getElementById("btn-catalog-next").addEventListener("click", () => {
+        const totalPages = Math.ceil(allProducts.length / pageSize);
+        if (currentPage < totalPages) { currentPage++; renderTable(); }
+    });
+
+    document.getElementById("filter-prod-cat").addEventListener("change", fetchProducts);
+    document.getElementById("filter-prod-search").addEventListener("input", () => {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(fetchProducts, 300);
+    });
+    document.getElementById("btn-reset-prod").addEventListener("click", () => {
+        document.getElementById("filter-prod-cat").value = "";
+        document.getElementById("filter-prod-search").value = "";
+        fetchProducts();
+    });
+
+    await init();
+});
+</script>
+{% endblock %}
+

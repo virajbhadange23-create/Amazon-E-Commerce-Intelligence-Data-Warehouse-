@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+
+{% block title %}OLAP Multidimensional Cube Analysis{% endblock %}
+{% block page_title %}OLAP Multidimensional Cube Analysis{% endblock %}
+
+{% block content %}
+<!-- Notice Banner -->
+<div class="notice-badge">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>Interactive Multidimensional Online Analytical Processing: Roll-up, Drill-down, Slice, Dice, and Pivot.</span>
+</div>
+
+<!-- OLAP Operation Selector & Parameter Controls -->
+<div class="card">
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <!-- Operation Selector -->
+        <div>
+            <label for="olap-operation" class="form-label">OLAP Operation</label>
+            <select id="olap-operation" class="form-select" style="min-width: 180px; font-weight: 700;">
+                <option value="rollup">Roll-up (Hierarchy Aggregation)</option>
+                <option value="drilldown">Drill-down (Category &rarr; Product)</option>
+                <option value="slice">Slice (Single Dimension Cut)</option>
+                <option value="dice">Dice (Multi-Dimensional Subcube)</option>
+                <option value="pivot">Pivot (Cross-Tabulation Matrix)</option>
+            </select>
+        </div>
+
+        <!-- Dynamic Control Container -->
+        <div id="dynamic-controls" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+            <!-- Rollup controls -->
+            <div id="ctrl-rollup" class="op-control">
+                <label for="rollup-level" class="form-label">Roll-up Level</label>
+                <select id="rollup-level" class="form-select">
+                    <option value="quarter">Quarterly (Month &rarr; Quarter)</option>
+                    <option value="year">Yearly (Quarter &rarr; Year)</option>
+                    <option value="month">Monthly (Base Level)</option>
+                </select>
+            </div>
+
+            <!-- Drilldown controls -->
+            <div id="ctrl-drilldown" class="op-control" style="display: none;">
+                <label for="drilldown-category" class="form-label">Category to Drill Down</label>
+                <select id="drilldown-category" class="form-select">
+                    <option value="">All Categories (Summary)</option>
+                </select>
+            </div>
+
+            <!-- Slice controls -->
+            <div id="ctrl-slice" class="op-control" style="display: none;">
+                <label for="slice-type" class="form-label">Slice Dimension</label>
+                <select id="slice-type" class="form-select">
+                    <option value="category">Category Dimension</option>
+                    <option value="month">Month Dimension</option>
+                </select>
+                <select id="slice-val-select" class="form-select" style="margin-left: 0.5rem;">
+                    <!-- Injected dynamically -->
+                </select>
+            </div>
+
+            <!-- Dice controls -->
+            <div id="ctrl-dice" class="op-control" style="display: none;">
+                <label for="dice-cats" class="form-label">Selected Categories</label>
+                <select id="dice-cats" class="form-select">
+                    <option value="1,2">Audio &amp; Computers</option>
+                    <option value="3,4">Electronics &amp; Home</option>
+                    <option value="7,8">Wearables &amp; Gaming</option>
+                </select>
+
+                <select id="dice-start-ym" class="form-select" style="margin-left: 0.5rem;"></select>
+                <select id="dice-end-ym" class="form-select" style="margin-left: 0.5rem;"></select>
+            </div>
+
+            <!-- Pivot controls -->
+            <div id="ctrl-pivot" class="op-control" style="display: none;">
+                <label for="pivot-metric" class="form-label">Pivot Cell Measure</label>
+                <select id="pivot-metric" class="form-select">
+                    <option value="sales_amount">Total Sales Revenue (₹)</option>
+                    <option value="units_sold">Total Units Sold</option>
+                    <option value="avg_price">Average Selling Price (₹)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="margin-left: auto; display: flex; gap: 0.75rem;">
+            <button id="btn-run-olap" class="btn btn-primary">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Execute OLAP
+            </button>
+            <a id="btn-export-csv" href="#" class="btn btn-secondary">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Download CSV
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Visual Chart Representation of Current OLAP Result -->
+<div class="card" id="olap-chart-card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title" id="olap-chart-title">OLAP Visualization</h3>
+            <p class="card-subtitle" id="olap-chart-subtitle">Aggregated multi-dimensional metrics</p>
+        </div>
+        <span class="badge badge-primary" id="olap-op-badge">Roll-up</span>
+    </div>
+    <div class="chart-container" style="height: 340px;">
+        <canvas id="olapChart"></canvas>
+    </div>
+</div>
+
+<!-- OLAP Table Results View -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 class="card-title">OLAP Result Grid</h3>
+            <p class="card-subtitle">SQL query output directly from the dimensional data warehouse</p>
+        </div>
+        <span class="badge badge-success" id="olap-records-badge">0 Rows</span>
+    </div>
+
+    <div class="table-responsive" id="olap-table-container">
+        <!-- Tables injected via JavaScript -->
+        <table class="table" id="olap-table">
+            <thead id="olap-thead"></thead>
+            <tbody id="olap-tbody">
+                <tr><td style="text-align: center; color: var(--text-muted);">Execute an OLAP query to view results</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Tabular Pagination Controls -->
+    <div id="olap-pagination-container" style="display: none; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; gap: 0.5rem;">
+        <div style="font-size: 0.85rem; color: var(--text-muted);" id="olap-page-info">Showing 1–20 of 120 rows (Limit 20/page)</div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-secondary btn-sm" id="btn-olap-prev" disabled>Previous</button>
+            <span style="font-size: 0.85rem; font-weight: 600;" id="olap-current-page">Page 1 of 1</span>
+            <button class="btn btn-secondary btn-sm" id="btn-olap-next">Next</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    let olapChart = null;
+    let categoriesList = [];
+    let datesList = [];
+
+    // Load filter reference metadata
+    async function initMetadata() {
+        try {
+            const [cRes, dRes] = await Promise.all([
+                App.fetchAPI("/api/categories"),
+                App.fetchAPI("/api/date-range")
+            ]);
+            categoriesList = cRes.categories;
+            datesList = dRes.dates;
+
+            // Populate drilldown category select
+            const ddCat = document.getElementById("drilldown-category");
+            categoriesList.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.category_key;
+                opt.textContent = c.category_name;
+                ddCat.appendChild(opt);
+            });
+
+            // Populate dice dates
+            const startD = document.getElementById("dice-start-ym");
+            const endD = document.getElementById("dice-end-ym");
+            datesList.forEach((d, i) => {
+                const opt1 = new Option(d.year_month, d.year_month);
+                const opt2 = new Option(d.year_month, d.year_month);
+                if (i === 0) opt1.selected = true;
+                if (i === datesList.length - 1) opt2.selected = true;
+                startD.appendChild(opt1);
+                endD.appendChild(opt2);
+            });
+
+            updateSliceValues();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function updateSliceValues() {
+        const type = document.getElementById("slice-type").value;
+        const valSelect = document.getElementById("slice-val-select");
+        valSelect.innerHTML = "";
+        if (type === "category") {
+            categoriesList.forEach(c => {
+                valSelect.appendChild(new Option(c.category_name, c.category_key));
+            });
+        } else {
+            datesList.forEach(d => {
+                valSelect.appendChild(new Option(d.year_month, d.year_month));
+            });
+        }
+    }
+
+    document.getElementById("slice-type").addEventListener("change", updateSliceValues);
+
+    // Switch visible parameter controls on operation change
+    document.getElementById("olap-operation").addEventListener("change", function(e) {
+        const op = e.target.value;
+        document.querySelectorAll(".op-control").forEach(el => el.style.display = "none");
+        const activeCtrl = document.getElementById(`ctrl-${op}`);
+        if (activeCtrl) activeCtrl.style.display = "flex";
+
+        document.getElementById("olap-op-badge").textContent = op.toUpperCase();
+        executeOLAP();
+    });
+
+    // Execute OLAP Query
+    async function executeOLAP() {
+        const op = document.getElementById("olap-operation").value;
+        const params = new URLSearchParams({ operation: op });
+
+        if (op === "rollup") {
+            params.append("level", document.getElementById("rollup-level").value);
+        } else if (op === "drilldown") {
+            const cat = document.getElementById("drilldown-category").value;
+            if (cat) params.append("category_key", cat);
+        } else if (op === "slice") {
+            params.append("slice_type", document.getElementById("slice-type").value);
+            params.append("slice_val", document.getElementById("slice-val-select").value);
+        } else if (op === "dice") {
+            params.append("category_keys", document.getElementById("dice-cats").value);
+            params.append("start_ym", document.getElementById("dice-start-ym").value);
+            params.append("end_ym", document.getElementById("dice-end-ym").value);
+        } else if (op === "pivot") {
+            params.append("metric", document.getElementById("pivot-metric").value);
+        }
+
+        // Update CSV export link
+        document.getElementById("btn-export-csv").href = `/api/olap/export?${params.toString()}`;
+
+        try {
+            const res = await App.fetchAPI(`/api/olap/query?${params.toString()}`);
+            if (op === "pivot") {
+                renderPivotResult(res.data);
+            } else {
+                renderTabularResult(op, res.data);
+            }
+        } catch (e) {
+            console.error("OLAP query failed:", e);
+        }
+    }
+
+    let currentTabularData = [];
+    let currentTabularPage = 1;
+    const tabularPageSize = 20;
+
+    // Render Tabular Operations (Rollup, Drilldown, Slice, Dice) with Pagination
+    function renderTabularResult(op, data) {
+        currentTabularData = data || [];
+        document.getElementById("olap-records-badge").textContent = `${currentTabularData.length} Rows`;
+
+        const thead = document.getElementById("olap-thead");
+        thead.innerHTML = "";
+
+        if (!currentTabularData || currentTabularData.length === 0) {
+            document.getElementById("olap-tbody").innerHTML = `<tr><td style="text-align: center; color: var(--text-muted);">No records found matching query criteria.</td></tr>`;
+            document.getElementById("olap-pagination-container").style.display = "none";
+            return;
+        }
+
+        // Build Table Headers
+        const cols = Object.keys(currentTabularData[0]);
+        const trHead = document.createElement("tr");
+        cols.forEach(c => {
+            const th = document.createElement("th");
+            th.textContent = c.replace(/_/g, " ").toUpperCase();
+            if (typeof currentTabularData[0][c] === "number") th.className = "table-num";
+            trHead.appendChild(th);
+        });
+        thead.appendChild(trHead);
+
+        // Render first page
+        renderTabularPage(1);
+
+        // Render Chart with Top 15 Limit for visual clarity
+        renderTabularChart(op, currentTabularData);
+    }
+
+    function renderTabularPage(page) {
+        currentTabularPage = page;
+        const totalRows = currentTabularData.length;
+        const totalPages = Math.ceil(totalRows / tabularPageSize) || 1;
+        const startIdx = (page - 1) * tabularPageSize;
+        const endIdx = Math.min(startIdx + tabularPageSize, totalRows);
+        const pageRows = currentTabularData.slice(startIdx, endIdx);
+
+        const tbody = document.getElementById("olap-tbody");
+        tbody.innerHTML = "";
+
+        if (pageRows.length === 0) {
+            tbody.innerHTML = `<tr><td style="text-align: center; color: var(--text-muted);">No records found.</td></tr>`;
+            return;
+        }
+
+        const cols = Object.keys(pageRows[0]);
+        pageRows.forEach(row => {
+            const tr = document.createElement("tr");
+            cols.forEach(c => {
+                const td = document.createElement("td");
+                const val = row[c];
+                if (c.includes("sales") || c.includes("price") || c.includes("amount")) {
+                    td.textContent = App.formatCurrency(val);
+                    td.className = "table-num";
+                } else if (c.includes("discount") && typeof val === "number") {
+                    td.textContent = App.formatPercent(val);
+                    td.className = "table-num";
+                } else if (typeof val === "number") {
+                    td.textContent = App.formatNumber(val);
+                    td.className = "table-num";
+                } else {
+                    td.textContent = val;
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        // Update Pagination Controls
+        const paginationContainer = document.getElementById("olap-pagination-container");
+        if (totalRows > tabularPageSize) {
+            paginationContainer.style.display = "flex";
+            document.getElementById("olap-page-info").textContent = `Showing ${startIdx + 1}–${endIdx} of ${totalRows} rows (Limit 20/page)`;
+            document.getElementById("olap-current-page").textContent = `Page ${page} of ${totalPages}`;
+            document.getElementById("btn-olap-prev").disabled = (page <= 1);
+            document.getElementById("btn-olap-next").disabled = (page >= totalPages);
+        } else {
+            paginationContainer.style.display = "none";
+        }
+    }
+
+    // Pagination Button Listeners
+    document.getElementById("btn-olap-prev").addEventListener("click", () => {
+        if (currentTabularPage > 1) {
+            renderTabularPage(currentTabularPage - 1);
+        }
+    });
+
+    document.getElementById("btn-olap-next").addEventListener("click", () => {
+        const totalPages = Math.ceil(currentTabularData.length / tabularPageSize);
+        if (currentTabularPage < totalPages) {
+            renderTabularPage(currentTabularPage + 1);
+        }
+    });
+
+    // Render Pivot Matrix
+    function renderPivotResult(pivotData) {
+        document.getElementById("olap-records-badge").textContent = `${pivotData.categories.length} Categories × ${pivotData.months.length} Months`;
+        document.getElementById("olap-pagination-container").style.display = "none";
+
+        const thead = document.getElementById("olap-thead");
+        const tbody = document.getElementById("olap-tbody");
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        // Build Pivot Headers
+        const trHead = document.createElement("tr");
+        const thCat = document.createElement("th");
+        thCat.textContent = "CATEGORY";
+        trHead.appendChild(thCat);
+
+        pivotData.months.forEach(m => {
+            const th = document.createElement("th");
+            th.textContent = m;
+            th.className = "table-num";
+            trHead.appendChild(th);
+        });
+
+        const thTotal = document.createElement("th");
+        thTotal.textContent = "ROW TOTAL";
+        thTotal.className = "table-num";
+        trHead.appendChild(thTotal);
+        thead.appendChild(trHead);
+
+        // Build Pivot Rows
+        pivotData.rows.forEach(r => {
+            const tr = document.createElement("tr");
+            const tdName = document.createElement("td");
+            tdName.style.fontWeight = "700";
+            tdName.textContent = r.category;
+            tr.appendChild(tdName);
+
+            r.values.forEach(v => {
+                const td = document.createElement("td");
+                td.className = "table-num";
+                td.textContent = pivotData.metric === "units_sold" ? App.formatNumber(v) : App.formatCurrency(v);
+                tr.appendChild(td);
+            });
+
+            const tdTot = document.createElement("td");
+            tdTot.className = "table-num";
+            tdTot.style.fontWeight = "700";
+            tdTot.style.color = "var(--primary)";
+            tdTot.textContent = pivotData.metric === "units_sold" ? App.formatNumber(r.total) : App.formatCurrency(r.total);
+            tr.appendChild(tdTot);
+
+            tbody.appendChild(tr);
+        });
+
+        // Render Pivot Chart (Stacked Bar)
+        const canvas = document.getElementById("olapChart");
+        const colors = window.getChartThemeColors();
+        const palette = [
+            "#4f46e5", "#0ea5e9", "#10b981", "#f59e0b",
+            "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b"
+        ];
+
+        const datasets = pivotData.rows.map((r, i) => ({
+            label: r.category,
+            data: r.values,
+            backgroundColor: palette[i % palette.length],
+            borderRadius: 4
+        }));
+
+        const options = {
+            scales: {
+                x: { stacked: true },
+                y: {
+                    stacked: true,
+                    ticks: {
+                        callback: v => "₹" + (v >= 1000000 ? (v/1000000).toFixed(1) + "M" : (v/1000).toFixed(0) + "k")
+                    }
+                }
+            }
+        };
+
+        olapChart = ChartFactory.createBarChart(canvas, pivotData.months, datasets, options);
+    }
+
+    // Chart Renderer for Tabular Results (with Top 15 Limit for Readability)
+    function renderTabularChart(op, data) {
+        const canvas = document.getElementById("olapChart");
+        const colors = window.getChartThemeColors();
+
+        const maxBars = 15;
+        let chartData = [...data];
+
+        // Sort and limit to Top 15 if larger dataset (e.g. 120 products in drilldown)
+        if (chartData.length > maxBars) {
+            chartData.sort((a, b) => (b.total_sales_amount || 0) - (a.total_sales_amount || 0));
+            chartData = chartData.slice(0, maxBars);
+            document.getElementById("olap-chart-subtitle").textContent = `Showing Top ${maxBars} of ${data.length} items ranked by total sales for chart readability`;
+        } else {
+            document.getElementById("olap-chart-subtitle").textContent = "Aggregated multi-dimensional metrics";
+        }
+
+        let labels = [];
+        let values = [];
+        let labelKey = "quarter_label";
+
+        if (op === "rollup") {
+            const level = document.getElementById("rollup-level").value;
+            labelKey = level === "year" ? "year" : (level === "month" ? "year_month" : "quarter_label");
+            labels = chartData.map(d => String(d[labelKey]));
+            values = chartData.map(d => d.total_sales_amount);
+        } else if (op === "drilldown") {
+            labelKey = chartData[0].product_name ? "product_name" : "category_name";
+            labels = chartData.map(d => d[labelKey].length > 22 ? d[labelKey].substring(0, 20) + "..." : d[labelKey]);
+            values = chartData.map(d => d.total_sales_amount);
+        } else if (op === "slice") {
+            labelKey = chartData[0].year_month ? "year_month" : "category_name";
+            labels = chartData.map(d => d[labelKey]);
+            values = chartData.map(d => d.total_sales_amount);
+        } else if (op === "dice") {
+            labels = chartData.map(d => `${d.category_name} (${d.year_month})`);
+            values = chartData.map(d => d.total_sales_amount);
+        }
+
+        const datasets = [{
+            label: "Total Sales Amount (₹)",
+            data: values,
+            backgroundColor: "rgba(79, 70, 229, 0.75)",
+            borderColor: colors.primary,
+            borderWidth: 2,
+            borderRadius: 6
+        }];
+
+        const options = {
+            scales: {
+                y: {
+                    ticks: {
+                        callback: v => "₹" + (v >= 1000000 ? (v/1000000).toFixed(1) + "M" : (v/1000).toFixed(0) + "k")
+                    }
+                }
+            }
+        };
+
+        olapChart = ChartFactory.createBarChart(canvas, labels, datasets, options);
+    }
+
+    document.getElementById("btn-run-olap").addEventListener("click", executeOLAP);
+
+    await initMetadata();
+    await executeOLAP();
+});
+</script>
+{% endblock %}
